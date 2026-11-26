@@ -1,0 +1,59 @@
+{
+  "case_id": "arXiv:2011.03269v1-method-trial",
+  "status": "partial",
+  "result": {
+    "methods": [
+      {
+        "name": "Electron paramagnetic resonance (EPR)",
+        "purpose": "表征缺陷",
+        "anchor": "p1:3",
+        "evidence": "Electron paramagnetic resonance ... were used to characterize the defect",
+        "reproduce_info": "具体参数未在摘要中给出"
+      },
+      {
+        "name": "Optical spectroscopy",
+        "purpose": "表征缺陷",
+        "anchor": "p1:3",
+        "evidence": "optical spectroscopy were used to characterize the defect",
+        "reproduce_info": "波段/仪器未给出"
+      },
+      {
+        "name": "Density functional theory (DFT)",
+        "purpose": "确定原子结构",
+        "anchor": "p1:3",
+        "evidence": "DFT calculations were performed to identify the atomic structure",
+        "reproduce_info": "泛函/基组/软件未给出"
+      }
+    ],
+    "reproduce_checklist": [
+      "表征手段：已列出",
+      "关键参数：材料未提供",
+      "计算设置：材料未提供"
+    ]
+  },
+  "evidence_map": [
+    {
+      "claim": "使用EPR与光谱学表征缺陷",
+      "evidence": "Electron paramagnetic resonance and optical spectroscopy were used to characterize the defect",
+      "anchor": "p1:3"
+    },
+    {
+      "claim": "使用DFT确定原子结构",
+      "evidence": "DFT calculations were performed to identify the atomic structure",
+      "anchor": "p1:3"
+    }
+  ],
+  "verification": {
+    "fact_preservation": "通过：事实/数字/限定词/否定原样保留",
+    "anchor_validity": "通过：所有锚点指向输入中真实存在的段落",
+    "no_new_facts": "通过：未新增材料外信息"
+  },
+  "uncertainties": [
+    {
+      "item": "可复现信息严重不足",
+      "reason": "摘要仅列方法名称，无参数/仪器/软件版本，无法写出完整方法章节",
+      "location": "p1:3"
+    }
+  ],
+  "change_log": []
+}
