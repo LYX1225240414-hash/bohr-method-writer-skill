@@ -1,18 +1,92 @@
 {
   "case_id": "示例，非真实案例",
-  "status": "success",
-  "result": "[示例主结果，仅展示结构]",
+  "status": "partial",
+  "method_experiment_draft": {
+    "steps": "[示例：S1…S3 的正文，非正式案例答案]",
+    "setup": "[示例：训练/验证/测试分列]",
+    "parameters": "[示例：参数表对应正文]",
+    "datasets": "[示例：数据集版本与划分]",
+    "baselines": "[示例：同预算对照条件]",
+    "reproduce_and_limits": "[示例：复现命令与具体失效场景]"
+  },
+  "procedure_steps": [
+    {
+      "step_id": "S1",
+      "input": "[示例输入]",
+      "operation": "[示例操作]",
+      "output": "[示例输出]",
+      "decision": "[示例判断条件]",
+      "anchor": "p1:2"
+    }
+  ],
+  "parameter_table": [
+    {
+      "name": "[示例参数]",
+      "value": "[示例原样取值]",
+      "unit": "[示例单位]",
+      "applies_to": "[示例作用对象]",
+      "source": "config",
+      "anchor": "config:train.lr",
+      "consistent_with_text": true
+    }
+  ],
+  "experiment_setup": {
+    "training": "[示例：硬件/版本/环境/种子/重复次数]",
+    "validation": "[材料未述，待作者确认]",
+    "testing": "[示例]"
+  },
+  "dataset_splits": [],
+  "baseline_comparison": [],
+  "reproduction_checklist": [],
+  "limitations": [],
   "evidence_map": [
     {
       "claim": "[示例论断]",
-      "evidence": "[示例原文短引]",
-      "anchor": "p1:1"
+      "value": "[示例原样数值]",
+      "source_type": "config",
+      "evidence": "[示例原文/配置短引]",
+      "anchor": "config:train.lr",
+      "change_record": "无"
     }
   ],
   "verification": {
-    "fact_preservation": "示例：通过",
-    "anchor_validity": "示例：通过"
+    "element_coverage": {
+      "result": "fail",
+      "evidence": "示例：1/6 要素已写，仅演示字段结构"
+    },
+    "source_traceability": {
+      "result": "pass",
+      "evidence": "示例：1/1 参数有来源"
+    },
+    "value_consistency": {
+      "result": "na",
+      "evidence": "示例：无数值可比"
+    },
+    "anchor_spotcheck": {
+      "result": "na",
+      "evidence": "示例：未抽查"
+    },
+    "reproducibility": {
+      "result": "fail",
+      "evidence": "示例：0/6 复现项齐备"
+    },
+    "limitation_specificity": {
+      "result": "na",
+      "evidence": "示例：无限制条目"
+    },
+    "no_new_facts": {
+      "result": "pass",
+      "evidence": "示例：仅示意占位，新增事实数=0"
+    }
   },
-  "uncertainties": [],
+  "uncertainties": [
+    {
+      "item": "[示例缺口]",
+      "reason": "材料未述",
+      "anchor": "p1:2",
+      "question_for_author": "请补充该条件的取值与来源"
+    }
+  ],
+  "sources": ["[示例：输入文件名与范围]"],
   "change_log": []
 }
