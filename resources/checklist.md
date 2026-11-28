@@ -17,11 +17,15 @@
 - [ ] 计数：已写要素数 / 6
 
 ## 第 3 步：来源与数值（source_traceability / value_consistency）
+- [ ] 已跑 `param_lint.py scan` 建参数台账，`materials.json` 的 `param_count` 已记录
+- [ ] 已跑 `param_lint.py check`，`lint_report.md` 已逐条处理
+- [ ] `conflict` 全部按材料原值改正，或并列写入 uncertainties 请作者确认
+- [ ] `orphan` 为 0，或每条都有出处说明与作者确认记录（不得留未解释的数值）
+- [ ] `missing` 已评估：应补的补进章节，确不相关的写明理由
 - [ ] 每个数值、单位与限定词与配置/日志/代码/原文一致
 - [ ] 参数表取值与正文逐项一致；无材料外补值
-- [ ] 冲突取值并列并写入 uncertainties，未擅自择一
 - [ ] 每条 claim 在 evidence_map 中有 evidence 与 anchor
-- [ ] 计数：有来源参数数 / 参数总数；正文—表格—原始材料一致数 / 抽查数
+- [ ] 计数：`source_traceability` = (matched+conflict)/draft_numeric_mentions；`value_consistency` = matched/(matched+conflict)
 
 ## 第 4 步：草稿与追问（reproducibility / limitation_specificity）
 - [ ] 六段可编辑草稿齐全，步骤可直接照做
