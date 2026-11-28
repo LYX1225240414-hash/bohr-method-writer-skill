@@ -85,6 +85,14 @@ python3 "$L" check --materials-json /app/work/materials.json \
 
 `scan` 从配置（json/yaml/toml/ini/env）、日志、代码中抽取参数台账，每项带 `文件:行号` 锚点；`check` 把草稿里的每个数值与台账逐条比对，输出四类：
 
+**行文写法也能抓到**：正文通常不写 `batch_size = 64`，而是 "a batch size of 128"、"the random seed was fixed at 42"、"hidden dimension 256"、"80% training / 10% validation"、"4 layers"。`check` 会先抽取每个数值，再回看它前面的 60 字符窗口，用参数名（含 `batch size`、`hidden dimension`、`random seed`、`number of layers` 等口语写法）反解出对应参数，因此这类句子同样会进入 `conflict` / `matched`。三条口径要记住：
+
+- **百分比与小数等价**：正文写 `80%`、配置写 `0.8` 属同一取值，不判冲突。
+- **比值方向**：`80% training` 归到 `train_ratio`、`10% validation` 归到 `val_ratio`；材料里没有 `test_ratio` 时，正文的 `10% test` 会被如实报成 `orphan`，需要你补出处或改口径。
+- **只认与材料同名或同义的参数**：解析不出的数值不会硬塞给某个参数，避免编造对应关系。
+
+`--out` 既可传目录（脚本写入 `lint_report.json` / `lint_report.md`），也可传具体文件名（如 `--out /app/work/lint_report.json`），两种写法都不会报错。
+
 | 类别 | 含义 | 必须动作 |
 |---|---|---|
 | `conflict` | 正文数值与材料不一致 | **按材料原值改正**；确有两版材料时并列两值写入 `uncertainties`，不擅自择一 |
