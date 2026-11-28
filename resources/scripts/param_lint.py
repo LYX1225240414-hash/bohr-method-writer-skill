@@ -40,6 +40,24 @@ import re
 import sys
 from pathlib import Path
 
+
+def _as_outfile(p, default_name):
+    """--out 兼容层：传目录则写入目录下 default_name，传文件名则直接写该文件。"""
+    path = Path(p)
+    if path.is_dir() or not path.suffix:
+        path = path / default_name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _as_outdir(p):
+    """--out 兼容层：传的是文件名时取其父目录，避免把文件路径当目录用而崩溃。"""
+    path = Path(p)
+    if path.suffix.lower() in (".json", ".md", ".txt", ".yaml", ".yml", ".csv", ".tex", ".bib"):
+        path = path.parent if str(path.parent) not in ("", ".") else Path(".")
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
 TEXT_EXT = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env",
             ".log", ".txt", ".out", ".csv", ".md", ".py", ".sh", ".yaml5"}
 CONFIG_EXT = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env"}
@@ -88,14 +106,23 @@ def is_number(v):
     return bool(NUM_RE.match(str(v).strip()))
 
 
-def num_equal(a, b, tol=1e-9):
+def num_equal(a, b, unit_a="", tol=1e-9):
+    sa, sb = str(a).strip(), str(b).strip()
+    pa, pb = sa.endswith("%"), sb.endswith("%")
     try:
-        x, y = float(str(a).rstrip("%")), float(str(b).rstrip("%"))
-        if x == y:
-            return True
-        return abs(x - y) <= tol * max(1.0, abs(x), abs(y))
+        x, y = float(sa.rstrip("%")), float(sb.rstrip("%"))
     except Exception:
-        return str(a).strip().lower() == str(b).strip().lower()
+        return sa.lower() == sb.lower()
+    # 一边用百分比、一边用小数（80% 与 0.8）是同一取值，不能判为冲突
+    if pa and not pb:
+        x = x / 100.0
+    elif unit_a.strip() == "%" and not pb and 0 < y < 1:
+        x = x / 100.0   # 正文写 80%，配置写 0.8，属同一取值
+    elif pb and not pa:
+        y = y / 100.0
+    if x == y:
+        return True
+    return abs(x - y) <= tol * max(1.0, abs(x), abs(y))
 
 
 # ---------------------------------------------------------------- 配置解析
@@ -232,8 +259,8 @@ def cmd_scan(args):
         v["distinct_values"] = sorted({str(it["value"]) for it in uniq})
     out = {"ok": True, "materials_root": str(root), "files_scanned": files_scanned,
            "skipped": skipped, "param_count": len(inv), "inventory": inv}
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    _p = _as_outfile(args.out, "materials.json")
+    _p.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"ok": True, "out": args.out, "param_count": len(inv),
                       "files_scanned": len(files_scanned), "skipped": len(skipped)},
                      ensure_ascii=False))
@@ -257,12 +284,83 @@ VALUE_FIRST = re.compile(
     r"(epochs?|steps?|iterations?|layers?|heads?|batch(?:es)?|seeds?|repeats?|trials?)\b", re.I)
 
 
-def parse_draft(path):
+PROSE_NUM = re.compile(
+    r"(?<![\w.])([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\s*(%|[A-Za-zμ°][A-Za-z°/·μ]{0,12})?")
+# 数值与参数名之间的连接成分（"a batch size **of** 128" / "seed **was fixed at** 42"）
+CONNECT = re.compile(
+    r"^[\s_,]*(?:(?:was|were|is|are|has been|had been|of|set to|fixed at|fixed to|"
+    r"initialized to|initialised to|chosen as|taken as|used|reaches|reached|=|:|为|是|取|设为|设置为|达到)"
+    r"[\s_,]*)*$", re.I)
+# 行文中常见的口语化写法（不在代码别名里，但论文正文经常这么写）
+PROSE_ALIASES = {
+    "hidden dimension": "hidden_size", "hidden dimensions": "hidden_size",
+    "hidden layer size": "hidden_size", "hidden units": "hidden_size",
+    "batch size": "batch_size", "batch sizes": "batch_size", "mini-batch size": "batch_size",
+    "learning rate": "learning_rate", "initial learning rate": "learning_rate",
+    "random seed": "random_seed", "random seeds": "random_seed", "seed value": "random_seed",
+    "number of layers": "num_layers", "layer count": "num_layers", "depth": "num_layers",
+    "number of epochs": "epochs", "training epochs": "epochs",
+    "training set": "train_ratio", "validation set": "val_ratio", "test set": "test_ratio",
+    "peak memory": "peak_memory", "gpu memory": "peak_memory",
+}
+# 比值类参数在行文里常写成 "80% training / 10% validation"
+RATIO_WORDS = {"training": "train_ratio", "train": "train_ratio",
+               "validation": "val_ratio", "valid": "val_ratio", "dev": "val_ratio",
+               "test": "test_ratio", "testing": "test_ratio"}
+
+
+def key_variants(inv_keys):
+    """把材料里的 canonical key 展开成行文中可能出现的写法，长的优先。"""
+    vs = {}
+    for k in inv_keys:
+        vs[k.replace("_", " ")] = k
+        vs[k] = k
+        for a, c in ALIASES.items():
+            if c == k:
+                vs[a.replace("_", " ")] = k
+                vs[a] = k
+        for a, c in PROSE_ALIASES.items():
+            if c == k:
+                vs[a] = k
+                vs[a.replace(" ", "_")] = k
+        for pre in ("train_", "training_", "model_", "opt_", "optimizer_"):
+            if k.startswith(pre) and len(k) > len(pre) + 2:
+                vs[k[len(pre):].replace("_", " ")] = k
+    return sorted(((p, c) for p, c in vs.items() if len(p) >= 3), key=lambda x: -len(x[0]))
+
+
+def prose_mentions(line, variants):
+    """从行文句子里抽取「参数名 + 取值」，解决只在散文里写参数时的漏检。"""
+    out, low = [], line.lower()
+    for m in PROSE_NUM.finditer(low):
+        val, unit = m.group(1), (m.group(2) or "").strip()
+        head = low[max(0, m.start() - 60):m.start()]
+        best = None
+        for phrase, canon in variants:
+            idx = head.rfind(phrase)
+            if idx < 0 or not CONNECT.match(head[idx + len(phrase):]):
+                continue
+            if best is None or len(phrase) > best[0]:
+                best = (len(phrase), canon, head[idx:])
+        if best:
+            out.append({"raw_key": best[2].strip()[-40:], "key": best[1], "value": val,
+                        "unit": unit, "line": None, "snippet": line.strip()[:180]})
+            continue
+        tail = low[m.end():m.end() + 24]
+        w = re.match(r"^[\s%]*(?:of\s+(?:the\s+)?)?([a-z]{4,12})", tail)
+        if w and w.group(1) in RATIO_WORDS:
+            out.append({"raw_key": w.group(1), "key": RATIO_WORDS[w.group(1)], "value": val,
+                        "unit": unit, "line": None, "snippet": line.strip()[:180]})
+    return out
+
+
+def parse_draft(path, inv_keys=()):
     res = []
     try:
         lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
     except Exception as e:
         return res, f"读取草稿失败: {e}"
+    variants = key_variants(inv_keys) if inv_keys else []
     for i, line in enumerate(lines, 1):
         if len(line) > 3000:
             continue
@@ -276,6 +374,10 @@ def parse_draft(path):
             res.append({"raw_key": m.group(2), "key": norm_key(m.group(2)),
                         "value": clean_val(m.group(1)), "unit": m.group(2),
                         "line": i, "snippet": line.strip()[:180]})
+        if variants and not line.lstrip().startswith(("#", "|")):
+            for it in prose_mentions(line, variants):
+                it["line"] = i
+                res.append(it)
     # 同一行同一 key 去重
     seen, uniq = set(), []
     for r in res:
@@ -290,7 +392,7 @@ def parse_draft(path):
 def cmd_check(args):
     mat = json.loads(Path(args.materials_json).read_text(encoding="utf-8"))
     inv = mat.get("inventory", {})
-    draft, err = parse_draft(args.draft)
+    draft, err = parse_draft(args.draft, list(inv.keys()))
     if err:
         print(json.dumps({"ok": False, "error": err}, ensure_ascii=False))
         return 1
@@ -306,7 +408,7 @@ def cmd_check(args):
             })
             continue
         vals = [str(x) for x in ent.get("distinct_values", [])]
-        if any(num_equal(d["value"], v) for v in vals):
+        if any(num_equal(d["value"], v, d.get("unit", "")) for v in vals):
             matched.append({"key": d["key"], "value": d["value"], "source_anchor": ent["sources"][:3],
                             "anchor": f"draft:L{d['line']}"})
         else:
@@ -352,7 +454,7 @@ def cmd_check(args):
             "element_coverage": f"材料数值型参数 {len(inv)} 个，正文未提 {len(missing)} 个",
         },
     }
-    outdir = Path(args.out)
+    outdir = _as_outdir(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "lint_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     # 人读版
@@ -425,8 +527,7 @@ DRAFT_TEMPLATE = """# 方法与实验章节草稿（六段骨架，缺处标 [�
 
 
 def cmd_init(args):
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = _as_outfile(args.out, "method_experiment_draft.md")
     out.write_text(DRAFT_TEMPLATE, encoding="utf-8")
     print(json.dumps({"ok": True, "out": str(out)}, ensure_ascii=False))
     return 0
