@@ -1,0 +1,52 @@
+name: method-writer
+version: 1.0.0
+entrypoint: ../SKILL.md
+bundle_root: ..
+description: >
+  方法与实验章节写作 Skill 的资源清单。执行内核为 resources/scripts/param_lint.py，
+  负责从配置/日志/代码抽取参数台账，并与章节草稿逐条比对，输出冲突、无来源数值与未覆盖项。
+
+resources:
+  - path: resources/scripts/param_lint.py
+    kind: executable
+    runtime: python3
+    entry: "python3 resources/scripts/param_lint.py"
+    subcommands: [scan, check, init]
+    requires: []          # 纯标准库，无第三方依赖
+    inputs: ["材料目录（json/yaml/toml/ini/env/log/txt/py/sh）", "章节草稿 markdown"]
+    outputs: ["/app/work/materials.json", "/app/work/lint_report.json", "/app/work/lint_report.md"]
+    outputs_note: >
+      lint_report 的 verification_hint 直接给出 source_traceability /
+      value_consistency / no_new_facts / element_coverage 四项的计数口径，
+      可原样写入 result.json 的 verification。
+
+  - path: resources/method_template.md
+    kind: template
+    purpose: 六类要素抽取要点与六段章节结构模板
+
+  - path: resources/gain_protocol.md
+    kind: doc
+    purpose: 使用增益对照协议（加载 Skill vs 不加载同材料同预算的记录方法）
+
+  - path: resources/checklist.md
+    kind: doc
+    purpose: 带计数的自检清单，对应 verification 七项
+
+  - path: resources/field_dict.md
+    kind: doc
+    purpose: 字段字典与锚点格式
+
+  - path: resources/output_example.json
+    kind: sample
+    purpose: 输出结构示意（占位，非任何真实案例草稿）
+
+  - path: examples/README.md
+    kind: doc
+    purpose: 最小调用示例与完整步骤
+
+runtime:
+  python: ">=3.9"
+  network: not_required
+  notes: >
+    脚本只读材料，不改动输入；所有结论带 文件:行号 锚点。
+    orphan（正文有、材料查不到）只提示确认，不自动删改，避免误删作者确认过的参数。
