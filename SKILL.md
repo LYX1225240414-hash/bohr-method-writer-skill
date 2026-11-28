@@ -1,6 +1,6 @@
 ---
 name: method-writer
-description: 从真实的实验记录、配置、日志、代码与数据说明中抽取方法步骤、实验设置、参数、数据集划分、对照与复现 limitation 六类要素，生成字段齐备、数值有源、正文与参数表一致、缺口显式追问的可编辑方法与实验章节草稿；当用户要求撰写或补写方法与实验章节、核对参数与来源、整理复现清单或标注材料缺口时使用，支持中英文科研材料。
+description: 从真实的实验记录、配置、日志、代码与数据说明中抽取方法步骤、实验设置、参数、数据集划分、对照与复现 limitation 六类要素，生成字段齐备、数值有源、正文与参数表一致、缺口显式追问的可编辑方法与实验章节草稿；内置可离线运行的参数一致性检查脚本（param_lint.py），把正文数值与配置/日志/代码逐条比对，机械检出冲突、无来源数值与未覆盖参数；当用户要求撰写或补写方法与实验章节、核对参数与来源、整理复现清单或标注材料缺口时使用，支持中英文科研材料。
 ---
 
 # 方法与实验章节：写得全、写得准、做得着、说得住
@@ -44,6 +44,7 @@ description: 从真实的实验记录、配置、日志、代码与数据说明�
 | reproduction_checklist | 数组，每项含 `item` / `value_or_command` / `source` / `anchor`；覆盖代码版本、环境依赖、数据获取、训练/评测命令与输出位置 |
 | limitations | 数组，每项含 `condition` / `failure_scenario` / `boundary` / `anchor`；限制必须落到具体失效场景，不写套话 |
 | evidence_map | 数组，每项含 `claim` / `value` / `source_type` / `evidence` / `anchor` / `change_record`；数字、术语、图表和关键论断均可逐条回查 |
+| gain_record | 对象，含 `conditions` / `mode` / `baseline` / `with_skill` / `delta_note` / `verifiable_artifacts`；按 `resources/gain_protocol.md` 填写，无对照产出时写 `na` 并说明 |
 | verification | 对象，逐项给 `result`（pass/fail/na）与 `evidence`（**带具体计数或抽查片段**）：`element_coverage`、`source_traceability`、`value_consistency`、`anchor_spotcheck`、`reproducibility`、`limitation_specificity`、`no_new_facts` |
 | uncertainties | 数组，每项含 `item` / `reason` / `anchor` / `question_for_author`；材料缺失、冲突、无来源参数、版本不明分别说明 |
 | sources | 使用的输入文件与页码/段号/配置键/日志行范围，界定输入边界 |
@@ -72,18 +73,48 @@ description: 从真实的实验记录、配置、日志、代码与数据说明�
 抽取结果同时写入 `procedure_steps` / `experiment_setup` / `parameter_table` / `dataset_splits` / `baseline_comparison` / `reproduction_checklist` / `limitations`，每条带 `anchor`。
 
 ### 第 3 步：数值对齐与证据台账（写得准）
-逐条比对正文数值与参数表、配置、日志、代码：`value`、`unit`、`applies_to` 原样保留，限定词与否定关系不改变；正文每处数值都能在 `evidence_map` 找到对应条目。发现冲突时并列两份取值与各自锚点，写入 `uncertainties` 并请作者确认，不擅自择一。对图表为图片、数字无法读取的情况保留占位与锚点，不猜内容。
+
+**先跑脚本，再人工判读**——这是"写得准"与"不新增事实"的机械证据：
+
+```bash
+L=/skills/weekly-skill/resources/scripts/param_lint.py
+python3 "$L" scan  --materials <材料目录> --out /app/work/materials.json
+python3 "$L" check --materials-json /app/work/materials.json \
+                   --draft /app/output/method_experiment_draft.md --out /app/work
+```
+
+`scan` 从配置（json/yaml/toml/ini/env）、日志、代码中抽取参数台账，每项带 `文件:行号` 锚点；`check` 把草稿里的每个数值与台账逐条比对，输出四类：
+
+| 类别 | 含义 | 必须动作 |
+|---|---|---|
+| `conflict` | 正文数值与材料不一致 | **按材料原值改正**；确有两版材料时并列两值写入 `uncertainties`，不擅自择一 |
+| `orphan` | 正文出现、材料查不到 | **疑似新增事实**：找到真实出处并补锚点，否则删除该数值 |
+| `matched` | 有来源且一致 | 直接作为 `evidence_map` 条目填入 |
+| `missing` | 材料有、正文未写 | 补进对应章节，提升"写得全" |
+
+产物：`/app/work/lint_report.json`（机读，含 `source_coverage` 与各计数）、`/app/work/lint_report.md`（人读，按冲突/无来源/未覆盖分组列出）。`verification_hint` 字段可直接作为 `verification` 的计数底稿。
+
+脚本跑完后仍需人工判断：术语与单位是否与材料一致、限定词与否定关系是否被改写、图表为图片时数值是否被误读。脚本只能发现"数值对不上"，发现不了"意思被改写"。
+
 
 ### 第 4 步：生成可编辑章节草稿（做得着）
 按六段结构写 `method_experiment_draft`：步骤可直接照做，设置按训练/验证/测试分列，参数表与正文数值一致，数据集版本与划分无歧义，对照条件可比，复现清单给全命令与版本。所有缺口用 `[材料未述，待作者确认]` 标注，并在 `uncertainties` 给出 `question_for_author`。同时写出三个可编辑 Markdown 产物。
 
 ### 第 5 步：带计数的自检与回修（说得住）
-逐项核对 `resources/checklist.md`，把**计数**写进 `verification`：
-- `element_coverage`：六类要素已写/应为 6；`source_traceability`：有来源参数数/参数总数；
-- `value_consistency`：正文—参数表—原始材料一致数/抽查数；`anchor_spotcheck`：按锚点回查成功数/抽查数；
-- `reproducibility`：复现清单齐备项数/应填项数；`limitation_specificity`：具体到失效场景的限制数/限制总数；
-- `no_new_facts`：材料外新增事实数（必须为 0，并说明抽查方式）。
+逐项核对 `resources/checklist.md`，**优先采用 `param_lint.py` 的机械计数**（`lint_report.json`），只有脚本测不出的项才人工计数：
+- `source_traceability`：有来源参数数 / 正文数值提及数（取 `matched + conflict` / `draft_numeric_mentions`）；
+- `value_consistency`：一致数 / 可比对数（取 `matched / (matched + conflict)`）；
+- `no_new_facts`：`orphan_count` 必须为 0，或逐条给出作者确认记录；
+- `element_coverage`：六类要素已写段数 / 6；材料数值型参数未覆盖数取 `missing_count`；
+- `anchor_spotcheck`：按锚点回查成功数 / 抽查数，附短引片段；
+- `reproducibility`：复现清单齐备项数 / 应填项数；
+- `limitation_specificity`：具体到失效场景的限制数 / 限制总数。
+
 失败项回到第 2–4 步修正并记入 `change_log`；仍无法解决则 `status: partial`、列出人工接管位置，不得把失败写成通过。
+
+### 第 5.5 步：增益记录（使用增益 25 分）
+按 `resources/gain_protocol.md` 记录对照条件、指标与可复算产物，写入 `result.json` 的 `gain_record`。无对照产出时用"同一运行内两版草稿"方式（先盲写一版 `draft_blind.md`，再按六步产出定稿），分别跑 `param_lint.py check` 比较 `conflict_count` / `orphan_count` / `missing_count` 的变化。**不得编造对照数据**，测不出就写 `na` 并说明原因。
+
 
 ### 第 6 步：输出与复核
 写 `/app/output/result.json` 与三个可编辑产物，确认 `case_id` 已回填、`output_contract` 字段齐全、`verification` 含计数、`uncertainties` 与 `change_log` 如实填写，草稿中无未标注的推断数值。
@@ -101,12 +132,32 @@ description: 从真实的实验记录、配置、日志、代码与数据说明�
 
 ## 资源
 
+- `resources/scripts/param_lint.py`：**执行内核**。`scan` 建参数台账（配置/日志/代码 → 带文件行号锚点）、`check` 比对草稿并分出 conflict/orphan/matched/missing、`init` 生成六段草稿骨架。纯标准库，无第三方依赖。
+- `environment/resources.yaml`：资源清单、依赖、运行时与产物说明。
 - `resources/method_template.md`：六类要素抽取与章节草稿模板。
+- `resources/gain_protocol.md`：使用增益对照协议与 `gain_record` 记录格式。
 - `resources/checklist.md`：带计数的自检清单。
 - `resources/field_dict.md`：字段字典与锚点格式。
 - `resources/output_example.json`：输出结构示意（非答案）。
 - `examples/README.md`：最小调用示例（示意）。
 
-## 最小示例
+## 最小示例（示意，非真实案例草稿）
 
-见 `examples/README.md`。示意输出仅展示字段结构，不代表任何真实科研案例的章节草稿。
+```bash
+L=/skills/weekly-skill/resources/scripts/param_lint.py
+python3 "$L" init  --out /app/output/method_experiment_draft.md
+python3 "$L" scan  --materials /app/work/materials --out /app/work/materials.json
+python3 "$L" check --materials-json /app/work/materials.json \
+                   --draft /app/output/method_experiment_draft.md --out /app/work
+```
+
+示意输出（仅结构，数值为占位）：
+
+```json
+{"ok": true, "inventory_size": 12, "draft_numeric_mentions": 9,
+ "matched_count": 8, "conflict_count": 1, "orphan_count": 0, "missing_count": 3,
+ "source_coverage": 0.889}
+```
+
+真正的结果必须来自本次实际运行，示意输出不得冒充正式案例答案。
+
