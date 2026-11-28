@@ -1,5 +1,5 @@
 name: method-writer
-version: 1.0.0
+version: 1.1.0
 entrypoint: ../SKILL.md
 bundle_root: ..
 description: >
@@ -50,3 +50,6 @@ runtime:
   notes: >
     脚本只读材料，不改动输入；所有结论带 文件:行号 锚点。
     orphan（正文有、材料查不到）只提示确认，不自动删改，避免误删作者确认过的参数。
+
+changelog:
+  - "1.1.0: 新增行文参数抽取（a batch size of 128 / hidden dimension 256 / 80% training）与百分比-小数等价判定；--out 兼容目录或文件名。"
